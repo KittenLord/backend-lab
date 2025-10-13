@@ -1,0 +1,12 @@
+version: "3"
+
+services:
+  amogus-app:
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: "6969"
+    ports:
+      - "8080:6969"
