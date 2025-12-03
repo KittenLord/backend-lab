@@ -1,31 +1,77 @@
 from accounting_app import app
 from flask import jsonify, request
 from datetime import datetime
+import random
+
+
+
+users = []
+categories = []
+records = []
 
 
 # get user
 # -> { "id": int, "name": string }
 @app.route("/user/<user_id>", methods=[ "GET" ])
 def user_get(user_id):
-    pass
+    global users
+
+    print(users)
+
+    user_id = int(user_id)
+    user = next((user for user in users if user["id"] == user_id), None)
+
+    if user is None:
+        return jsonify({
+            "error": "User not found"
+        }), 404
+
+    return jsonify({
+        "id": user["id"],
+        "name": user["name"]
+    }), 200
+
 
 # delete user
 @app.route("/user/<user_id>", methods=[ "DELETE" ])
 def user_delete(user_id):
-    pass
+    global users
+
+    old_len = len(users)
+    users = [user for user in users if user["id"] != user_id]
+    if old_len == len(users):
+        return jsonify({
+            "error": "User not found"
+        }), 404
+
+    return Response(status=204)
 
 # create user
 # <- { "name": string }
 # -> { "id": int }
 @app.route("/user", methods=[ "POST" ])
 def user_create():
-    pass
+    global users
+
+    data = request.get_json()
+    if data is None:
+        return jsonify({ "error": "No user name provided" }), 400
+
+    id = random.getrandbits(64)
+
+    users.append({
+        "id": id,
+        "name": data.get("name")
+    })
+
+    return jsonify({ "id": id }), 200
 
 # list all users
 # -> [ { "id": int } ]
 @app.route("/users", methods=[ "GET" ])
 def users_list():
-    pass
+    users_ids = [user["id"] for user in users]
+    return jsonify(users_ids), 200
 
 
 
