@@ -212,7 +212,7 @@ def record_get(record_id):
     global records
 
     record_id = int(record_id)
-    record = next((record for record in records if record["id"] == record_id), None)
+    record = RecordModel.query.get(record_id)
 
     if record is None:
         return jsonify({
@@ -220,11 +220,11 @@ def record_get(record_id):
         }), 404
 
     return jsonify({
-        "id": record["id"],
-        "user_id": record["user_id"],
-        "category_id": record["category_id"],
-        "created_at": record["created_at"],
-        "amount": record["amount"],
+        "id": record.id,
+        "user_id": record.user_id,
+        "category_id": record.category_id,
+        "created_at": record.created_at,
+        "amount": record.amount,
     }), 200
 
 # delete record
@@ -233,12 +233,14 @@ def record_delete(record_id):
     global records
 
     record_id = int(record_id)
-    old_len = len(records)
-    records = [record for record in records if record["id"] != record_id]
-    if old_len == len(records):
+    record = RecordModel.query.get(record_id)
+    if record is None:
         return jsonify({
             "error": "Record not found"
         }), 404
+
+    db.session.delete(record)
+    db.session.commit()
 
     return Response(status=204)
 
@@ -253,18 +255,11 @@ def record_create():
     if data is None:
         return jsonify({ "error": "No record information provided" }), 400
 
-    id = random.getrandbits(64)
-    stamp = datetime.now()
+    record = RecordModel(user_id=data.get("category_id"), category_id=data.get("category_id"), amount=data.get("amount"))
+    db.session.add(record)
+    db.session.commit()
 
-    records.append({
-        "id": id,
-        "user_id": data.get("user_id"),
-        "category_id": data.get("category_id"),
-        "created_at": stamp,
-        "amount": data.get("amount"),
-    })
-
-    return jsonify({ "id": id, "created_at": stamp }), 200
+    return jsonify({ "id": record.id, "created_at": record.created_at }), 200
 
 # list all records matching filter
 # <- ?user_id, ?category_id (category_id is optional)
@@ -282,8 +277,18 @@ def record_get_filter():
     if user_id is None:
         return jsonify({ "error": "Can't list records without a user provided" }), 400
 
-    records_filtered = [ record["id"] for record in records if record["user_id"] == user_id and (category_id is None or record["category_id"] == category_id) ]
-    return jsonify(records_filtered), 200
+    query = RecordModel.query.with_entities(RecordModel.id)
+    query = query.filter(RecordModel.user_id == user_id)
+    
+    if category_id is not None:
+        query = query.filter(RecordModel.category_id == category_id)
+
+    record_ids = [record.id for record in query.all()]
+    return jsonify(record_ids), 200
+
+
+
+
 
 
 @app.route("/healthcheck")
