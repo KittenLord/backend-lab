@@ -149,10 +149,8 @@ def users_list():
 # -> { "id": int, "name": string }
 @app.route("/category/<category_id>", methods=[ "GET" ])
 def category_get(category_id):
-    global categories
-
     category_id = int(category_id)
-    category = next((category for category in categories if category["id"] == category_id), None)
+    category = CategoryModel.query.get(category_id)
 
     if category is None:
         return jsonify({
@@ -160,52 +158,49 @@ def category_get(category_id):
         }), 404
 
     return jsonify({
-        "id": category["id"],
-        "name": category["name"]
+        "id": category.id,
+        "name": category.name,
+        "user_id": category.user_id,
     }), 200
 
 # delete category
 @app.route("/category/<category_id>", methods=[ "DELETE" ])
 def category_delete(category_id):
-    global categories
-
     category_id = int(category_id)
-    old_len = len(categories)
-    categories = [category for category in categories if category["id"] != category_id]
-    if old_len == len(categories):
+    category = CategoryModel.query.get(category_id)
+    if category is None:
         return jsonify({
             "error": "Category not found"
         }), 404
 
+    db.session.delete(category)
+    db.session.commit()
+
     return Response(status=204)
 
 # create category
-# <- { "name": string }
+# <- { "name": string, "user_id": int (optional) }
 # -> { "id": int }
 @app.route("/category", methods=[ "POST" ])
 def category_create():
-    global categories
-
     data = request.get_json()
     if data is None:
         return jsonify({ "error": "No category name provided" }), 400
 
-    id = random.getrandbits(64)
+    name = data.get("name")
+    user_id = data.get("user_id")
 
-    categories.append({
-        "id": id,
-        "name": data.get("name")
-    })
+    category = CategoryModel(name=name, user_id=user_id)
+    db.session.add(category)
+    db.session.commit()
 
-    return jsonify({ "id": id }), 200
+    return jsonify({ "id": category.id }), 200
 
 # list all categories
 # -> [ { "id": int } ]
 @app.route("/categories", methods=[ "GET" ])
 def categories_list():
-    global categories
-
-    categories_ids = [category["id"] for category in categories]
+    categories_ids = [category.id for category in CategoryModel.query.with_entities(CategoryModel.id).all()]
     return jsonify(categories_ids), 200
 
 
