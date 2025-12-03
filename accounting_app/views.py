@@ -1,5 +1,5 @@
 from accounting_app import app
-from flask import jsonify, request
+from flask import jsonify, request, Response
 from datetime import datetime
 import random
 
@@ -15,8 +15,6 @@ records = []
 @app.route("/user/<user_id>", methods=[ "GET" ])
 def user_get(user_id):
     global users
-
-    print(users)
 
     user_id = int(user_id)
     user = next((user for user in users if user["id"] == user_id), None)
@@ -37,6 +35,7 @@ def user_get(user_id):
 def user_delete(user_id):
     global users
 
+    user_id = int(user_id)
     old_len = len(users)
     users = [user for user in users if user["id"] != user_id]
     if old_len == len(users):
@@ -70,6 +69,8 @@ def user_create():
 # -> [ { "id": int } ]
 @app.route("/users", methods=[ "GET" ])
 def users_list():
+    global users
+
     users_ids = [user["id"] for user in users]
     return jsonify(users_ids), 200
 
@@ -79,25 +80,64 @@ def users_list():
 # -> { "id": int, "name": string }
 @app.route("/category/<category_id>", methods=[ "GET" ])
 def category_get(category_id):
-    pass
+    global categories
+
+    category_id = int(category_id)
+    category = next((category for category in categories if category["id"] == category_id), None)
+
+    if category is None:
+        return jsonify({
+            "error": "Category not found"
+        }), 404
+
+    return jsonify({
+        "id": category["id"],
+        "name": category["name"]
+    }), 200
 
 # delete category
 @app.route("/category/<category_id>", methods=[ "DELETE" ])
 def category_delete(category_id):
-    pass
+    global categories
+
+    category_id = int(category_id)
+    old_len = len(categories)
+    categories = [category for category in categories if category["id"] != category_id]
+    if old_len == len(categories):
+        return jsonify({
+            "error": "Category not found"
+        }), 404
+
+    return Response(status=204)
 
 # create category
 # <- { "name": string }
 # -> { "id": int }
 @app.route("/category", methods=[ "POST" ])
 def category_create():
-    pass
+    global categories
+
+    data = request.get_json()
+    if data is None:
+        return jsonify({ "error": "No category name provided" }), 400
+
+    id = random.getrandbits(64)
+
+    categories.append({
+        "id": id,
+        "name": data.get("name")
+    })
+
+    return jsonify({ "id": id }), 200
 
 # list all categories
 # -> [ { "id": int } ]
-@app.route("/categories", methods=[ "POiGET" ])
+@app.route("/categories", methods=[ "GET" ])
 def categories_list():
-    pass
+    global categories
+
+    categories_ids = [category["id"] for category in categories]
+    return jsonify(categories_ids), 200
 
 
 
