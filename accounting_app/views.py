@@ -6,6 +6,78 @@ import random
 from flask_smorest import Api, Blueprint
 from marshmallow import Schema, fields
 
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
+
+db = SQLAlchemy()
+
+
+class UserSchema(Schema):
+    id = fields.Int(dump_only=True)
+    name = fields.Str(required=True)
+
+class UserModel(db.Model):
+    __tablename__ = "user"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), unique=False, nullable=False)
+
+    records = db.relationship("RecordModel", back_populates="user", lazy="dynamic")
+    categories = db.relationship("CategoryModel", back_populates="user", lazy="dynamic")
+
+
+
+
+class CategorySchema(Schema):
+    id = fields.Int(dump_only=True)
+    user_id = fields.Int(required=True)
+    name = fields.Str(required=True)
+
+class CategoryModel(db.Model):
+    __tablename__ = "category"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(128), unique=False, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
+    user = db.relationship("UserModel", back_populates="categories")
+    records = db.relationship("RecordModel", back_populates="user", lazy="dynamic")
+
+
+
+
+class RecordSchema(Schema):
+    id = fields.Int(dump_only=True)
+    user_id = fields.Int(required=True)
+    category_id = fields.Int(required=True)
+    created_at = fields.DateTime(required=True)
+    amount = fields.Int(required=True)
+
+class RecordModel(db.Model):
+    __tablename__ = "record"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id"),
+        unique=False,
+        nullable=False,
+    )
+
+    category_id = db.Column(
+        db.Integer,
+        db.ForeignKey("category.id"),
+        unique=False,
+        nullable=False,
+    )
+
+    created_at = db.Column(db.TIMESTAMP, server_default=func.now())
+    amount = db.Column(db.Integer, unique=False, nullable=False)
+
+    user = db.relationship("UserModel", back_populates="records")
+    category = db.relationship("CategoryModel", back_populates="records")
+
 
 
 users = []
