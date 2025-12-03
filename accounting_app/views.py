@@ -9,7 +9,7 @@ from marshmallow import Schema, fields
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
 
-db = SQLAlchemy()
+db = SQLAlchemy(app)
 
 
 class UserSchema(Schema):
@@ -41,7 +41,7 @@ class CategoryModel(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
 
     user = db.relationship("UserModel", back_populates="categories")
-    records = db.relationship("RecordModel", back_populates="user", lazy="dynamic")
+    records = db.relationship("RecordModel", back_populates="category", lazy="dynamic")
 
 
 
@@ -79,8 +79,11 @@ class RecordModel(db.Model):
     category = db.relationship("CategoryModel", back_populates="records")
 
 
+with app.app_context():
+    print("CREATE DB")
+    db.create_all()
 
-users = []
+
 categories = []
 records = []
 
@@ -89,10 +92,8 @@ records = []
 # -> { "id": int, "name": string }
 @app.route("/user/<user_id>", methods=[ "GET" ])
 def user_get(user_id):
-    global users
-
     user_id = int(user_id)
-    user = next((user for user in users if user["id"] == user_id), None)
+    user = UserModel.query.get(user_id)
 
     if user is None:
         return jsonify({
@@ -100,23 +101,23 @@ def user_get(user_id):
         }), 404
 
     return jsonify({
-        "id": user["id"],
-        "name": user["name"]
+        "id": user.id,
+        "name": user.name
     }), 200
 
 
 # delete user
 @app.route("/user/<user_id>", methods=[ "DELETE" ])
 def user_delete(user_id):
-    global users
-
     user_id = int(user_id)
-    old_len = len(users)
-    users = [user for user in users if user["id"] != user_id]
-    if old_len == len(users):
+    user = UserModel.query.get(user_id)
+    if user is None:
         return jsonify({
             "error": "User not found"
         }), 404
+
+    db.session.delete(user)
+    db.session.commit()
 
     return Response(status=204)
 
@@ -125,28 +126,21 @@ def user_delete(user_id):
 # -> { "id": int }
 @app.route("/user", methods=[ "POST" ])
 def user_create():
-    global users
-
     data = request.get_json()
     if data is None:
         return jsonify({ "error": "No user name provided" }), 400
 
-    id = random.getrandbits(64)
+    user = UserModel(name=data.get("name"))
+    db.session.add(user)
+    db.session.commit()
 
-    users.append({
-        "id": id,
-        "name": data.get("name")
-    })
-
-    return jsonify({ "id": id }), 200
+    return jsonify({ "id": user.id }), 200
 
 # list all users
 # -> [ { "id": int } ]
 @app.route("/users", methods=[ "GET" ])
 def users_list():
-    global users
-
-    users_ids = [user["id"] for user in users]
+    users_ids = [user.id for user in UserModel.query.with_entities(UserModel.id).all()]
     return jsonify(users_ids), 200
 
 
