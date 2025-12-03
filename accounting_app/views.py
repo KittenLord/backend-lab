@@ -145,28 +145,81 @@ def categories_list():
 # -> { "id": int, "user_id": int, "category_id": int, "created_at": time, "amount": int }
 @app.route("/record/<record_id>", methods=[ "GET" ])
 def record_get(record_id):
-    pass
+    global records
+
+    record_id = int(record_id)
+    record = next((record for record in records if record["id"] == record_id), None)
+
+    if record is None:
+        return jsonify({
+            "error": "Record not found"
+        }), 404
+
+    return jsonify({
+        "id": record["id"],
+        "user_id": record["user_id"],
+        "category_id": record["category_id"],
+        "created_at": record["created_at"],
+        "amount": record["amount"],
+    }), 200
 
 # delete record
 @app.route("/record/<record_id>", methods=[ "DELETE" ])
 def record_delete(record_id):
-    pass
+    global records
+
+    record_id = int(record_id)
+    old_len = len(records)
+    records = [record for record in records if record["id"] != record_id]
+    if old_len == len(records):
+        return jsonify({
+            "error": "Record not found"
+        }), 404
+
+    return Response(status=204)
 
 # create record
 # <- { "user_id": int, "category_id": int, "amount": int }
 # -> { "id": int, "created_at": time }
 @app.route("/record", methods=[ "POST" ])
-def record_create(record_id):
-    pass
+def record_create():
+    global records
+
+    data = request.get_json()
+    if data is None:
+        return jsonify({ "error": "No record information provided" }), 400
+
+    id = random.getrandbits(64)
+    stamp = datetime.now()
+
+    records.append({
+        "id": id,
+        "user_id": data.get("user_id"),
+        "category_id": data.get("category_id"),
+        "created_at": stamp,
+        "amount": data.get("amount"),
+    })
+
+    return jsonify({ "id": id, "created_at": stamp }), 200
 
 # list all records matching filter
 # <- ?user_id, ?category_id (category_id is optional)
 # -> [ { "id": int } ]
 @app.route("/record", methods=[ "GET" ])
 def record_get_filter():
+    global records
+
     user_id = request.args.get("user_id")
+    user_id = int(user_id) if (user_id is not None and user_id != "") else None
+
     category_id = request.args.get("category_id")
-    pass
+    category_id = int(category_id) if (category_id is not None and category_id != "") else None
+
+    if user_id is None:
+        return jsonify({ "error": "Can't list records without a user provided" }), 400
+
+    records_filtered = [ record["id"] for record in records if record["user_id"] == user_id and (category_id is None or record["category_id"] == category_id) ]
+    return jsonify(records_filtered), 200
 
 
 @app.route("/healthcheck")
