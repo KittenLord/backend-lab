@@ -5,4 +5,4 @@ workdir /docker-app
 copy requirements.txt .
 run python -m pip install -r requirements.txt
 copy . /docker-app
-cmd flask --app amogus run -h 0.0.0.0 -p $PORT
+cmd flask --app accounting_app run -h 0.0.0.0 -p $PORT
