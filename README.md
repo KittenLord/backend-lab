@@ -2,6 +2,7 @@
 
 ```sh
 pip install -r requirements.txt
+export DB_URI=<URI_TO_YOUR_DATABSE>
 flask run --app accounting-app --host 0.0.0.0 --port 8080
 ```
 
