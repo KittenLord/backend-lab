@@ -30,7 +30,7 @@ class UserModel(db.Model):
 
 class CategorySchema(Schema):
     id = fields.Int(dump_only=True)
-    user_id = fields.Int(required=True)
+    user_id = fields.Int(required=False)
     name = fields.Str(required=True)
 
 class CategoryModel(db.Model):
@@ -50,7 +50,7 @@ class RecordSchema(Schema):
     id = fields.Int(dump_only=True)
     user_id = fields.Int(required=True)
     category_id = fields.Int(required=True)
-    created_at = fields.DateTime(required=True)
+    created_at = fields.DateTime(dump_only=True)
     amount = fields.Int(required=True)
 
 class RecordModel(db.Model):
@@ -84,10 +84,6 @@ with app.app_context():
     db.create_all()
 
 
-categories = []
-records = []
-
-
 # get user
 # -> { "id": int, "name": string }
 @app.route("/user/<user_id>", methods=[ "GET" ])
@@ -100,10 +96,7 @@ def user_get(user_id):
             "error": "User not found"
         }), 404
 
-    return jsonify({
-        "id": user.id,
-        "name": user.name
-    }), 200
+    return UserSchema().dump(user), 200
 
 
 # delete user
@@ -127,10 +120,9 @@ def user_delete(user_id):
 @app.route("/user", methods=[ "POST" ])
 def user_create():
     data = request.get_json()
-    if data is None:
-        return jsonify({ "error": "No user name provided" }), 400
+    data = UserSchema().load(data)
 
-    user = UserModel(name=data.get("name"))
+    user = UserModel(name=data["name"])
     db.session.add(user)
     db.session.commit()
 
@@ -157,11 +149,7 @@ def category_get(category_id):
             "error": "Category not found"
         }), 404
 
-    return jsonify({
-        "id": category.id,
-        "name": category.name,
-        "user_id": category.user_id,
-    }), 200
+    return CategorySchema().dump(category), 200
 
 # delete category
 @app.route("/category/<category_id>", methods=[ "DELETE" ])
@@ -184,13 +172,9 @@ def category_delete(category_id):
 @app.route("/category", methods=[ "POST" ])
 def category_create():
     data = request.get_json()
-    if data is None:
-        return jsonify({ "error": "No category name provided" }), 400
+    data = CategorySchema().load(data)
 
-    name = data.get("name")
-    user_id = data.get("user_id")
-
-    category = CategoryModel(name=name, user_id=user_id)
+    category = CategoryModel(name=data["name"], user_id=data["user_id"])
     db.session.add(category)
     db.session.commit()
 
@@ -209,8 +193,6 @@ def categories_list():
 # -> { "id": int, "user_id": int, "category_id": int, "created_at": time, "amount": int }
 @app.route("/record/<record_id>", methods=[ "GET" ])
 def record_get(record_id):
-    global records
-
     record_id = int(record_id)
     record = RecordModel.query.get(record_id)
 
@@ -219,19 +201,11 @@ def record_get(record_id):
             "error": "Record not found"
         }), 404
 
-    return jsonify({
-        "id": record.id,
-        "user_id": record.user_id,
-        "category_id": record.category_id,
-        "created_at": record.created_at,
-        "amount": record.amount,
-    }), 200
+    return RecordSchema().dump(record), 200
 
 # delete record
 @app.route("/record/<record_id>", methods=[ "DELETE" ])
 def record_delete(record_id):
-    global records
-
     record_id = int(record_id)
     record = RecordModel.query.get(record_id)
     if record is None:
@@ -249,13 +223,12 @@ def record_delete(record_id):
 # -> { "id": int, "created_at": time }
 @app.route("/record", methods=[ "POST" ])
 def record_create():
-    global records
-
     data = request.get_json()
-    if data is None:
-        return jsonify({ "error": "No record information provided" }), 400
+    data = RecordSchema().load(data)
 
-    record = RecordModel(user_id=data.get("category_id"), category_id=data.get("category_id"), amount=data.get("amount"))
+    # TODO: validate that category_id has user_id == user_id, or none
+
+    record = RecordModel(user_id=data["user_id"], category_id=data["category_id"], amount=data["amount"])
     db.session.add(record)
     db.session.commit()
 
@@ -266,8 +239,6 @@ def record_create():
 # -> [ { "id": int } ]
 @app.route("/record", methods=[ "GET" ])
 def record_get_filter():
-    global records
-
     user_id = request.args.get("user_id")
     user_id = int(user_id) if (user_id is not None and user_id != "") else None
 
