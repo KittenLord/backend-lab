@@ -4,7 +4,7 @@ from datetime import datetime
 import random
 
 from flask_smorest import Api, Blueprint
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate, validates, validates_schema, ValidationError
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
@@ -14,7 +14,7 @@ db = SQLAlchemy(app)
 
 class UserSchema(Schema):
     id = fields.Int(dump_only=True)
-    name = fields.Str(required=True)
+    name = fields.Str(required=True, validate=validate.Length(min=1))
 
 class UserModel(db.Model):
     __tablename__ = "user"
@@ -31,7 +31,17 @@ class UserModel(db.Model):
 class CategorySchema(Schema):
     id = fields.Int(dump_only=True)
     user_id = fields.Int(required=False)
-    name = fields.Str(required=True)
+    name = fields.Str(required=True, validate=validate.Length(min=1))
+
+    @validates("user_id")
+    def user_exists_or_global(self, user_id, data_key):
+        # Global category
+        if user_id is None:
+            return
+
+        user = UserModel().query.get(user_id)
+        if user is None:
+            raise ValidationError(f"User with id {user_id} doesn't exist")
 
 class CategoryModel(db.Model):
     __tablename__ = "category"
@@ -51,7 +61,30 @@ class RecordSchema(Schema):
     user_id = fields.Int(required=True)
     category_id = fields.Int(required=True)
     created_at = fields.DateTime(dump_only=True)
-    amount = fields.Int(required=True)
+    amount = fields.Int(required=True, validate=validate.Range(min=1))
+
+    @validates("user_id")
+    def user_exists(self, user_id, data_key):
+        user = UserModel.query.get(user_id)
+        if user is None:
+            raise ValidationError(f"User with id {user_id} doesn't exist")
+
+    @validates("category_id")
+    def category_exists(self, category_id, data_key):
+        category = CategoryModel.query.get(category_id)
+
+        if category is None:
+            raise ValidationError(f"Category with id {category_id} doesn't exist")
+
+    @validates_schema()
+    def user_owns_category(self, data, **kwargs):
+        user_id = data.get("user_id")
+        category_id = data.get("category_id")
+
+        category = CategoryModel.query.get(category_id)
+
+        if category.user_id is not None and category.user_id != user_id:
+            raise ValidationError(f"User cannot create a record with a personal category that doesn't belong to them")
 
 class RecordModel(db.Model):
     __tablename__ = "record"
@@ -88,13 +121,14 @@ with app.app_context():
 # -> { "id": int, "name": string }
 @app.route("/user/<user_id>", methods=[ "GET" ])
 def user_get(user_id):
-    user_id = int(user_id)
-    user = UserModel.query.get(user_id)
+    try:
+        user_id = int(user_id)
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 400
 
+    user = UserModel.query.get(user_id)
     if user is None:
-        return jsonify({
-            "error": "User not found"
-        }), 404
+        return jsonify({ "error": "User not found" }), 404
 
     return UserSchema().dump(user), 200
 
@@ -102,12 +136,14 @@ def user_get(user_id):
 # delete user
 @app.route("/user/<user_id>", methods=[ "DELETE" ])
 def user_delete(user_id):
-    user_id = int(user_id)
+    try:
+        user_id = int(user_id)
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 400
+
     user = UserModel.query.get(user_id)
     if user is None:
-        return jsonify({
-            "error": "User not found"
-        }), 404
+        return jsonify({ "error": "User not found" }), 404
 
     db.session.delete(user)
     db.session.commit()
@@ -119,8 +155,13 @@ def user_delete(user_id):
 # -> { "id": int }
 @app.route("/user", methods=[ "POST" ])
 def user_create():
-    data = request.get_json()
-    data = UserSchema().load(data)
+    data = None
+
+    try:
+        data = request.get_json()
+        data = UserSchema().load(data)
+    except ValidationError as e:
+        return jsonify({ "error": str(e) })
 
     user = UserModel(name=data["name"])
     db.session.add(user)
@@ -141,25 +182,28 @@ def users_list():
 # -> { "id": int, "name": string }
 @app.route("/category/<category_id>", methods=[ "GET" ])
 def category_get(category_id):
-    category_id = int(category_id)
-    category = CategoryModel.query.get(category_id)
+    try:
+        category_id = int(category_id)
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 400
 
+    category = CategoryModel.query.get(category_id)
     if category is None:
-        return jsonify({
-            "error": "Category not found"
-        }), 404
+        return jsonify({ "error": "Category not found" }), 404
 
     return CategorySchema().dump(category), 200
 
 # delete category
 @app.route("/category/<category_id>", methods=[ "DELETE" ])
 def category_delete(category_id):
-    category_id = int(category_id)
+    try:
+        category_id = int(category_id)
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 400
+
     category = CategoryModel.query.get(category_id)
     if category is None:
-        return jsonify({
-            "error": "Category not found"
-        }), 404
+        return jsonify({ "error": "Category not found" }), 404
 
     db.session.delete(category)
     db.session.commit()
@@ -171,10 +215,13 @@ def category_delete(category_id):
 # -> { "id": int }
 @app.route("/category", methods=[ "POST" ])
 def category_create():
-    data = request.get_json()
-    data = CategorySchema().load(data)
+    try:
+        data = request.get_json()
+        data = CategorySchema().load(data)
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 400
 
-    category = CategoryModel(name=data["name"], user_id=data["user_id"])
+    category = CategoryModel(name=data["name"], user_id=data.get("user_id"))
     db.session.add(category)
     db.session.commit()
 
@@ -193,25 +240,28 @@ def categories_list():
 # -> { "id": int, "user_id": int, "category_id": int, "created_at": time, "amount": int }
 @app.route("/record/<record_id>", methods=[ "GET" ])
 def record_get(record_id):
-    record_id = int(record_id)
-    record = RecordModel.query.get(record_id)
+    try:
+        record_id = int(record_id)
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 400
 
+    record = RecordModel.query.get(record_id)
     if record is None:
-        return jsonify({
-            "error": "Record not found"
-        }), 404
+        return jsonify({ "error": "Record not found" }), 404
 
     return RecordSchema().dump(record), 200
 
 # delete record
 @app.route("/record/<record_id>", methods=[ "DELETE" ])
 def record_delete(record_id):
-    record_id = int(record_id)
+    try:
+        record_id = int(record_id)
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 400
+
     record = RecordModel.query.get(record_id)
     if record is None:
-        return jsonify({
-            "error": "Record not found"
-        }), 404
+        return jsonify({ "error": "Record not found" }), 404
 
     db.session.delete(record)
     db.session.commit()
@@ -223,10 +273,11 @@ def record_delete(record_id):
 # -> { "id": int, "created_at": time }
 @app.route("/record", methods=[ "POST" ])
 def record_create():
-    data = request.get_json()
-    data = RecordSchema().load(data)
-
-    # TODO: validate that category_id has user_id == user_id, or none
+    try:
+        data = request.get_json()
+        data = RecordSchema().load(data)
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 400
 
     record = RecordModel(user_id=data["user_id"], category_id=data["category_id"], amount=data["amount"])
     db.session.add(record)
