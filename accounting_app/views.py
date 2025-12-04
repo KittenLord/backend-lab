@@ -1,4 +1,5 @@
 from accounting_app import app
+import psycopg2
 from flask import jsonify, request, Response
 from datetime import datetime
 import random
