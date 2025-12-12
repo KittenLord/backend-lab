@@ -140,7 +140,13 @@ def user_get(user_id):
 
 # delete user
 @app.route("/user/<user_id>", methods=[ "DELETE" ])
+@jwt_required()
 def user_delete(user_id):
+    verified_user_id = get_jwt_identity()
+    if verified_user_id != user_id:
+        return jsonify({ "error": "Not authorized" }), 401
+
+
     try:
         user_id = int(user_id)
     except Exception as e:
