@@ -3,6 +3,7 @@ import psycopg2
 from flask import jsonify, request, Response
 from datetime import datetime
 import random
+from flask_jwt_extended import *
 
 from flask_smorest import Api, Blueprint
 from marshmallow import Schema, fields, validate, validates, validates_schema, ValidationError
@@ -22,6 +23,7 @@ class UserModel(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(128), unique=False, nullable=False)
+    password = db.Column(db.String(255), unique=False, nullable=False)
 
     records = db.relationship("RecordModel", back_populates="user", lazy="dynamic")
     categories = db.relationship("CategoryModel", back_populates="user", lazy="dynamic")
@@ -152,17 +154,20 @@ def user_delete(user_id):
     return Response(status=204)
 
 # create user
-# <- { "name": string }
+# <- { "name": string, "password": string }
 # -> { "id": int }
 @app.route("/user", methods=[ "POST" ])
 def user_create():
-    data = None
+    data = request.get_json()
 
-    try:
-        data = request.get_json()
-        data = UserSchema().load(data)
-    except ValidationError as e:
-        return jsonify({ "error": str(e) })
+    name = data["name"]
+    password = data["password"]
+
+    # try:
+    #     data = request.get_json()
+    #     data = UserSchema().load(data)
+    # except ValidationError as e:
+    #     return jsonify({ "error": str(e) })
 
     user = UserModel(name=data["name"])
     db.session.add(user)
@@ -173,6 +178,7 @@ def user_create():
 # list all users
 # -> [ { "id": int } ]
 @app.route("/users", methods=[ "GET" ])
+@jwt_required()
 def users_list():
     users_ids = [user.id for user in UserModel.query.with_entities(UserModel.id).all()]
     return jsonify(users_ids), 200
