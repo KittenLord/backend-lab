@@ -1,4 +1,4 @@
-from accounting_app import app
+from accounting_app import app, jwt
 import psycopg2
 from flask import jsonify, request, Response
 from datetime import datetime
@@ -10,6 +10,8 @@ from marshmallow import Schema, fields, validate, validates, validates_schema, V
 
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func
+
+import passlib.hash as ph
 
 db = SQLAlchemy(app)
 
@@ -169,11 +171,30 @@ def user_create():
     # except ValidationError as e:
     #     return jsonify({ "error": str(e) })
 
-    user = UserModel(name=data["name"])
+    user = UserModel(name=name, password=ph.pbkdf2_sha256.hash(password))
     db.session.add(user)
     db.session.commit()
 
     return jsonify({ "id": user.id }), 200
+
+
+# login user (get access token)
+# <- { "password": string }
+# -> { "token": string }
+@app.route("/login", methods=[ "POST" ])
+def user_login():
+    data = request.get_json()
+
+    name = data["name"]
+    password = data["password"]
+    user = UserModel.query.filter_by(name=name).first()
+
+    if user and ph.pbkdf2_sha256.verify(password, user.password):
+        access_token = create_access_token(identity=user.id)
+
+    return jsonify({ "token": access_token }), 200
+
+
 
 # list all users
 # -> [ { "id": int } ]

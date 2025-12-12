@@ -1,8 +1,9 @@
 Flask==3.1.2
+flask_jwt_extended==4.6.0
 flask_smorest==0.46.2
 flask_sqlalchemy==3.1.1
-marshmallow==4.1.0
-psycopg2-binary==2.9.11
-SQLAlchemy==2.0.44
+marshmallow==4.1.1
 passlib==1.7.4
-flask_jwt_extended==4.6.0
+psycopg2==2.9.11
+SQLAlchemy==2.0.45
+PyJWT==2.9.0
