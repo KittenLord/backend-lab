@@ -12,7 +12,7 @@ app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
 # https://www.reddit.com/r/flask/comments/1hedkxa/flaskjwtextended_and_invalid_crypto_padding/
 app.config["JWT_VERIFY_SUB"] = False
 
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=1)
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=14)
 
 jwt = JWTManager(app)
 
