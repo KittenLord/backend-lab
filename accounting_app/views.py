@@ -142,16 +142,17 @@ def user_get(user_id):
 @app.route("/user/<user_id>", methods=[ "DELETE" ])
 @jwt_required()
 def user_delete(user_id):
+    try:
+        user_id = int(user_id)
+    except Exception as e:
+        return jsonify({ "error": str(e) }), 400
+
     verified_user_id = get_jwt_identity()
     print(verified_user_id, "/", user_id)
     if verified_user_id != user_id:
         return jsonify({ "error": f"Not authorized {verified_user_id} {user_id}" }), 401
 
 
-    try:
-        user_id = int(user_id)
-    except Exception as e:
-        return jsonify({ "error": str(e) }), 400
 
     user = UserModel.query.get(user_id)
     if user is None:

@@ -8,6 +8,7 @@ app = Flask(__name__)
 app.config.from_pyfile("config.py", silent=True)
 
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY")
+# https://www.reddit.com/r/flask/comments/1hedkxa/flaskjwtextended_and_invalid_crypto_padding/
 app.config["JWT_VERIFY_SUB"] = False
 
 jwt = JWTManager(app)
