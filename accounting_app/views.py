@@ -145,7 +145,7 @@ def user_delete(user_id):
     verified_user_id = get_jwt_identity()
     print(verified_user_id, "/", user_id)
     if verified_user_id != user_id:
-        return jsonify({ "error": "Not authorized" }), 401
+        return jsonify({ "error": f"Not authorized {verified_user_id} {user_id}" }), 401
 
 
     try:
