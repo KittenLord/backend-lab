@@ -229,6 +229,7 @@ def category_get(category_id):
 
 # delete category
 @app.route("/category/<category_id>", methods=[ "DELETE" ])
+@jwt_required()
 def category_delete(category_id):
     try:
         category_id = int(category_id)
@@ -253,6 +254,7 @@ def category_delete(category_id):
 # <- { "name": string, "user_id": int (optional) }
 # -> { "id": int }
 @app.route("/category", methods=[ "POST" ])
+@jwt_required()
 def category_create():
     try:
         data = request.get_json()
