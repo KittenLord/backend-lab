@@ -148,9 +148,8 @@ def user_delete(user_id):
         return jsonify({ "error": str(e) }), 400
 
     verified_user_id = get_jwt_identity()
-    print(verified_user_id, "/", user_id)
     if verified_user_id != user_id:
-        return jsonify({ "error": f"Not authorized {verified_user_id} {user_id}" }), 401
+        return jsonify({ "error": "Not authorized" }), 401
 
 
 
@@ -207,7 +206,6 @@ def user_login():
 # list all users
 # -> [ { "id": int } ]
 @app.route("/users", methods=[ "GET" ])
-@jwt_required()
 def users_list():
     users_ids = [user.id for user in UserModel.query.with_entities(UserModel.id).all()]
     return jsonify(users_ids), 200
@@ -241,6 +239,11 @@ def category_delete(category_id):
     if category is None:
         return jsonify({ "error": "Category not found" }), 404
 
+    if category.user_id is not None:
+        verified_user_id = get_jwt_identity()
+        if verified_user_id != category.user_id:
+            return jsonify({ "error": "Not authorized" }), 401
+
     db.session.delete(category)
     db.session.commit()
 
@@ -256,6 +259,13 @@ def category_create():
         data = CategorySchema().load(data)
     except Exception as e:
         return jsonify({ "error": str(e) }), 400
+
+    user_id = data.get("user_id")
+
+    if user_id is not None:
+        verified_user_id = get_jwt_identity()
+        if verified_user_id != user_id:
+            return jsonify({ "error": "Not authorized" }), 401
 
     category = CategoryModel(name=data["name"], user_id=data.get("user_id"))
     db.session.add(category)
@@ -289,6 +299,7 @@ def record_get(record_id):
 
 # delete record
 @app.route("/record/<record_id>", methods=[ "DELETE" ])
+@jwt_required()
 def record_delete(record_id):
     try:
         record_id = int(record_id)
@@ -299,6 +310,10 @@ def record_delete(record_id):
     if record is None:
         return jsonify({ "error": "Record not found" }), 404
 
+    verified_user_id = get_jwt_identity()
+    if verified_user_id != record.user_id:
+        return jsonify({ "error": "Not authorized" }), 401
+
     db.session.delete(record)
     db.session.commit()
 
@@ -308,12 +323,17 @@ def record_delete(record_id):
 # <- { "user_id": int, "category_id": int, "amount": int }
 # -> { "id": int, "created_at": time }
 @app.route("/record", methods=[ "POST" ])
+@jwt_required()
 def record_create():
     try:
         data = request.get_json()
         data = RecordSchema().load(data)
     except Exception as e:
         return jsonify({ "error": str(e) }), 400
+
+    verified_user_id = get_jwt_identity()
+    if verified_user_id != data["user_id"]:
+        return jsonify({ "error": "Not authorized" }), 401
 
     record = RecordModel(user_id=data["user_id"], category_id=data["category_id"], amount=data["amount"])
     db.session.add(record)
